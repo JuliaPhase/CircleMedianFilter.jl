@@ -125,77 +125,140 @@ Compute the arc distance median filter on circular data.
 
 
 """
-function arc_distance__median_filter!(u, y, r::Integer, t::Integer)
-    # The algorithm calcultes (using iterative relations) Gₘₙ -- a table of distances from the center pixel yₘₙ to all other pixel in the window R×T
-    # mirroring of the data is used for the pixels outside the image
-    #
-    # For current values of m and n, after calculating Gₘₙ it is saved in the n-th  position of the Gbuf array.
+using OffsetArrays
 
-    #check the sizes of the arrays
+function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
+    ## The algorithm calcultes (using iterative relations) Gₘₙ -- a table of distances from the center pixel yₘₙ to all other pixel in the window R×T
+    ## mirroring of the data is used for the pixels outside the image
+    ##
+    ## For current values of m and n, after calculating Gₘₙ it is saved in the n-th  position of the Gbuf array.
+
+    ##check the sizes of the arrays
     size(u) == size(y) || error("Input and output arrays must have the same size")
     ndims(u) == 2 || error("Input and output arrays must be 2-dimensional")
-    #check the radius
+    ##check the radius
     r < 0 && error("Radius r must be non-negative")
     t < 0 && error("Radius t must be non-negative")
-    #check the type of the arrays
+    ##check the type of the arrays
     (eltype(u) <: Real) || error("Input and output arrays must be of a real type")
     (eltype(y) <: Real) || error("Input array must be of a real type")
 
-    #calculate R and T
+    ##calculate R and T
     R = 2r + 1
     T = 2t + 1
 
+    # Make a shortcut for the distance function
+    dist(m, n, i, j) = d(mirror_index(y, m, n), mirror_index(y, i, j))
 
+    ## allocate buffer arrays for G and Z with natural indexing
+    ## each buffer has the length of the the second dimension of the input array
+    ## and its element is array with indices -r:r, -t:t
+    Gbuf = [OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t) for _ in 1:size(y, 2)]
+    Zbuf = [OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t) for _ in 1:size(y, 2)]
+    Gcurrent = OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t)
+    Zcurrent = OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t)
 
-
-    #allocate buffer arrays for G and Z
-    # each buffer has the length of the the second dimension of the input array
-    # and its element is array RxT
-    Gbuf = Array{Float64}(undef, size(y, 2), R, T)
-    Zbuf = Array{Float64}(undef, size(y, 2), R, T)
-    Gcurrent = Array{Float64}(undef, R, T)
-    Zcurrent = Array{Float64}(undef, R, T)
-
-
-
-    # Process the first column
+    ## Process the first column
     m = 1
-    # the first G is calculated by the definition
+    ## the first G is calculated by the definition
     n = 1
-    for i in (-r):r
-        for j in (-t):t
-            Gcurrent[i + r + 1, j + t + 1] = d(y[m, n], y[mirror_index(y, m + i, n + j)])
+    for k in (-r):r
+        for l in (-t):t
+            Gcurrent[k, l] = sum(
+                dist(m + k, n + l, m + i, n + j) for i in (-r):r, j in (-t):t
+            )
         end
     end
-    #  save to the buffer:
-    Gbuf[n, :, :] .= Gcurrent[:, :]
+    ##  save to the buffer:
+    Gbuf[n][:] .= Gcurrent[:]
+    u[m, n] = y[argmin(Gcurrent)]
 
-    # Process the rest of the first column:
+    ## Process the rest of the first column, using the previous calculated values:
     for n in 2:size(y, 2)
-        # Fill the buffer Gbuf for the first column
-        for i in (-r):r
-            for j in (-t):t
-                Gcurrent[i + r + 1, j + t + 1] =
-                    Gbuf[n - 1, i + r + 1, j + 1 + t + 1] +
-                    d(y[m, n], y[mirror_index(y, m + i, n + j)])
-                d(y[m, n], y[mirror_index(y, m + i, n + j)])
+        ## Fill the buffer Gbuf for the first column
+        for k in (-r):r
+            for l in (-t):(t - 1)
+                Gcurrent[k, l] =
+                    Gbuf[n - 1][k, l + 1] + sum(
+                        (dist(k, n + l, i, n + t) - dist(k, n + l, i, n - t - 1)) for
+                        i in (-r):r
+                    )
             end
+            Gcurrent[k, t] = sum(
+                dist(m + k, n + t, m + i, n + j) for i in (-r):r, j in (-t):t
+            )
         end
-        Gbuf[n, :, :] .= Gcurrent[:, :]
+
+        Gbuf[n] .= Gcurrent
+        u[m, n] = y[argmin(Gcurrent)]
     end
 
-    for n in 1:size(y, 2)
-        # Fill the buffer Gbuf and Zbuf for the first column
-        for i in 1:R
-            for j in 1:T
-                Gbuf[n, i, j] = d(y[m, n], y[m + i - 1, n])
-                Zbuf[n, i, j] = y[m + i - 1, n]
+    for m in 2:size(y, 1)
+        n = 1
+        for k in (-r):r # init auxiliary array Z
+            for l in (-t):t
+                Zbuf[n][k, l] = sum(
+                    (
+                        dist(m + k, n + l, m + r, n + j) -
+                        dist(m + k, n + l, m - r - 1, n + j)
+                    ) for j in (-t):t
+                )
             end
         end
+
+        for l in (-t):t # Compute first element G[m,0]
+            for k in (-r):(r - 1)
+                Gcurrent[k, l] .= Gbuf[n][k + 1, l] .+ Zbuf[n][k, l]
+            end
+            Gcurrent[r, t] = sum(dist(m + r, l, m + i, j) for i in (-r):r, j in (-t):t)
+        end
+
+        Gbuf[n] .= Gcurrent
+        u[m, n] = y[argmin(Gcurrent)]
+
+        for n in 2:size(y, 2)
+            for k in (-r):r # update Z
+                for l in (-t):(t - 1)
+                    Zcurrent[k, l] = -dist(m + k, n + l, m + r, n - t - 1)
+                    +dist(m + k, n + l, m - r - 1, n - t - 1)
+                    +dist(m + k, n + l, m + r, n + t)
+                    -dist(m + k, n + l, m - r - 1, n + l)
+                    +Zbuf[n - 1][k, l + 1]
+                end
+                Zcurrent[k, t] = sum(
+                    (
+                        dist(m + k, n + t, m + r, n + j) -
+                        dist(m + k, n + t, m - r - 1, n + j)
+                    ) for j in (-t):t
+                )
+            end
+            Zbuf[n - 1][:] .= Zcurrent[:]
+
+            for l in (-t):t # compute first 2r rows of Gmn
+                for k in (-r):(r - 1)
+                    Gcurrent[k, l] = Gbuf[n][k + 1, l] + Zcurrent[k, l]
+                end
+            end
+
+            for l in (-t):(t - 1) # Compute last row of Gmn
+                Gcurrent[r, l] =
+                    Gbuf[n - 1][r, l + 1] + sum(
+                        (
+                            dist(m + k, n + l, m + i, n + t) -
+                            dist(m + k, n + l, m + i, n + t - 1)
+                        ) for i in (-r):r
+                    )
+            end
+            Gcurrent[r, l] = sum(
+                dist(m + k, n + l, m + i, n + j) for i in (-r):r, j in (-t):t
+            )
+            Gbuf[n][:] .= Gcurrent[:]
+            u[m, n] = y[argmim(Gcurrent)]
+        end
     end
+    return u
 
 
-    # Process the other rows
 
 
 
