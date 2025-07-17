@@ -19,6 +19,8 @@ data living on the unit circle.
 """
 module CircleMedianFilter
 
+using OffsetArrays
+
 """
     d(a, b)
 
@@ -114,53 +116,89 @@ end
 """
     arc_distance__median_filter!(u, y, r, t)
 
-Compute the arc distance median filter on circular data.
+Compute the arc distance median filter on circular data using Algorithm 1 from
+Storath & Weinmann (2018).
 
-# Arguments
-- `u`: Filtered output array, must be the same size as `y`
-- `y`: Input array containing circular data (angles in radians)
- - `r`: half-width of the filter, defining the neighborhood size R = 2r+1 in the first coordinate
- - `t`: half-width of the filter, defining the neighborhood size T = 2t+1 in the second coordinate
+This function implements an efficient algorithm for computing median filters on circular
+data that preserves the circular nature of the input. The algorithm uses iterative
+relations to compute distance tables efficiently, making it suitable for large images
+with circular/angular data such as phase images or orientation fields.
 
+## Algorithm Details
 
+The function computes for each pixel the circular median within a (2r+1) × (2t+1)
+rectangular neighborhood. The circular median minimizes the sum of arc distances
+to all pixels in the neighborhood, providing robust edge-preserving smoothing.
 
-"""
+The implementation uses:
+- Mirrored boundary conditions via `mirror_index`
+- Iterative computation of distance tables G_{m,n} for efficiency
+- OffsetArrays for natural indexing with negative indices
+
+## Arguments
+- `u`: Pre-allocated output array for filtered results (modified in-place)
+- `y`: Input 2D array containing circular data (angles in radians)
+- `r::Integer`: Half-width of filter in first dimension (rows), so neighborhood size is 2r+1
+- `t::Integer`: Half-width of filter in second dimension (columns), so neighborhood size is 2t+1
+
+## Returns
+- `u`: The filtered output array (same object as input `u`)
+
+## Examples
+```julia
+using CircleMedianFilter
 using OffsetArrays
 
-function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
-    ## The algorithm calcultes (using iterative relations) Gₘₙ -- a table of distances from the center pixel yₘₙ to all other pixel in the window R×T
-    ## mirroring of the data is used for the pixels outside the image
-    ##
-    ## For current values of m and n, after calculating Gₘₙ it is saved in the n-th  position of the Gbuf array.
+## Create test phase data with some noise
+y = rand(50, 50) * 2π  ## Random phase data
+u = similar(y)         ## Pre-allocate output
 
-    ##check the sizes of the arrays
+## Apply 3×3 median filter (r=1, t=1)
+arc_distance_median_filter!(u, y, 1, 1)
+
+## Apply 5×7 median filter (r=2, t=3)
+arc_distance_median_filter!(u, y, 2, 3)
+```
+
+## Notes
+- Input angles should be in radians
+- The function modifies the output array `u` in-place for memory efficiency
+- Mirrored boundary conditions are used to handle edge pixels
+- The algorithm has O(MN·R·T) complexity where M×N is image size and R×T is filter size
+
+## References
+- Storath, M., & Weinmann, A. (2018). Fast median filtering for phase or orientation data.
+  IEEE Transactions on Pattern Analysis and Machine Intelligence, 40(3), 639-652.
+
+See also: [`d`](@ref), [`mirror_index`](@ref)
+"""
+function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
+    ## Input validation
     size(u) == size(y) || error("Input and output arrays must have the same size")
     ndims(u) == 2 || error("Input and output arrays must be 2-dimensional")
-    ##check the radius
-    r < 0 && error("Radius r must be non-negative")
-    t < 0 && error("Radius t must be non-negative")
-    ##check the type of the arrays
-    (eltype(u) <: Real) || error("Input and output arrays must be of a real type")
-    (eltype(y) <: Real) || error("Input array must be of a real type")
+    r >= 0 || error("Radius r must be non-negative")
+    t >= 0 || error("Radius t must be non-negative")
+    eltype(u) <: Real || error("Output array must be of a real type")
+    eltype(y) <: Real || error("Input array must be of a real type")
 
-    ##calculate R and T
+    ## Calculate filter dimensions
     R = 2r + 1
     T = 2t + 1
+    M, N = size(y)
 
-    # Make a shortcut for the distance function
+    ## Distance function with boundary handling
     dist(m, n, i, j) = d(mirror_index(y, m, n), mirror_index(y, i, j))
 
-    ## allocate buffer arrays for G and Z with natural indexing
-    ## each buffer has the length of the the second dimension of the input array
-    ## and its element is array with indices -r:r, -t:t
-    Gbuf = [OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t) for _ in 1:size(y, 2)]
-    Zbuf = [OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t) for _ in 1:size(y, 2)]
-    Gcurrent = OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t)
-    Zcurrent = OffsetArray(Array{Float64}(undef, R, T), (-r):r, (-t):t)
+    ## Allocate buffer arrays with offset indexing for natural -r:r, -t:t access
+    Gbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
+    Zbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
+    Gcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
+    Zcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
 
-    ## Process the first column
+    ## Process first column (m = 1)
     m = 1
-    ## the first G is calculated by the definition
+
+    ## Calculate first element G[1,1] by definition
     n = 1
     for k in (-r):r
         for l in (-t):t
@@ -169,33 +207,38 @@ function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
             )
         end
     end
-    ##  save to the buffer:
-    Gbuf[n][:] .= Gcurrent[:]
-    u[m, n] = y[argmin(Gcurrent)]
+    Gbuf[n] .= Gcurrent
+    ## Find median: pixel that minimizes sum of distances
+    min_idx = argmin(Gcurrent)
+    u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
 
-    ## Process the rest of the first column, using the previous calculated values:
-    for n in 2:size(y, 2)
-        ## Fill the buffer Gbuf for the first column
+    ## Process rest of first column using iterative updates
+    for n in 2:N
         for k in (-r):r
             for l in (-t):(t - 1)
                 Gcurrent[k, l] =
                     Gbuf[n - 1][k, l + 1] + sum(
-                        (dist(k, n + l, i, n + t) - dist(k, n + l, i, n - t - 1)) for
-                        i in (-r):r
+                        (
+                            dist(m + k, n + l, m + i, n + t) -
+                            dist(m + k, n + l, m + i, n - t - 1)
+                        ) for i in (-r):r
                     )
             end
+            ## Handle last column separately
             Gcurrent[k, t] = sum(
                 dist(m + k, n + t, m + i, n + j) for i in (-r):r, j in (-t):t
             )
         end
-
         Gbuf[n] .= Gcurrent
-        u[m, n] = y[argmin(Gcurrent)]
+        min_idx = argmin(Gcurrent)
+        u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
     end
 
-    for m in 2:size(y, 1)
+    ## Process remaining rows (m >= 2)
+    for m in 2:M
+        ## Initialize auxiliary array Z for first element of row
         n = 1
-        for k in (-r):r # init auxiliary array Z
+        for k in (-r):r
             for l in (-t):t
                 Zbuf[n][k, l] = sum(
                     (
@@ -206,24 +249,33 @@ function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
             end
         end
 
-        for l in (-t):t # Compute first element G[m,0]
-            for k in (-r):(r - 1)
-                Gcurrent[k, l] .= Gbuf[n][k + 1, l] .+ Zbuf[n][k, l]
+        ## Compute first element G[m,1] using previous row
+        for k in (-r):(r - 1)
+            for l in (-t):t
+                Gcurrent[k, l] = Gbuf[n][k + 1, l] + Zbuf[n][k, l]
             end
-            Gcurrent[r, t] = sum(dist(m + r, l, m + i, j) for i in (-r):r, j in (-t):t)
+        end
+        ## Handle last row separately
+        for l in (-t):t
+            Gcurrent[r, l] = sum(
+                dist(m + r, n + l, m + i, n + j) for i in (-r):r, j in (-t):t
+            )
         end
 
         Gbuf[n] .= Gcurrent
-        u[m, n] = y[argmin(Gcurrent)]
+        min_idx = argmin(Gcurrent)
+        u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
 
-        for n in 2:size(y, 2)
-            for k in (-r):r # update Z
+        ## Process remaining elements in current row
+        for n in 2:N
+            ## Update Z array
+            for k in (-r):r
                 for l in (-t):(t - 1)
-                    Zcurrent[k, l] = -dist(m + k, n + l, m + r, n - t - 1)
-                    +dist(m + k, n + l, m - r - 1, n - t - 1)
-                    +dist(m + k, n + l, m + r, n + t)
-                    -dist(m + k, n + l, m - r - 1, n + l)
-                    +Zbuf[n - 1][k, l + 1]
+                    Zcurrent[k, l] =
+                        Zbuf[n - 1][k, l + 1] + dist(m + k, n + l, m + r, n + t) -
+                        dist(m + k, n + l, m + r, n - t - 1) -
+                        dist(m + k, n + l, m - r - 1, n + t) +
+                        dist(m + k, n + l, m - r - 1, n - t - 1)
                 end
                 Zcurrent[k, t] = sum(
                     (
@@ -232,36 +284,36 @@ function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
                     ) for j in (-t):t
                 )
             end
-            Zbuf[n - 1][:] .= Zcurrent[:]
+            Zbuf[n - 1] .= Zcurrent
 
-            for l in (-t):t # compute first 2r rows of Gmn
-                for k in (-r):(r - 1)
+            ## Compute G[m,n] using iterative relations
+            for k in (-r):(r - 1)
+                for l in (-t):t
                     Gcurrent[k, l] = Gbuf[n][k + 1, l] + Zcurrent[k, l]
                 end
             end
 
-            for l in (-t):(t - 1) # Compute last row of Gmn
+            ## Handle last row
+            for l in (-t):(t - 1)
                 Gcurrent[r, l] =
                     Gbuf[n - 1][r, l + 1] + sum(
                         (
-                            dist(m + k, n + l, m + i, n + t) -
-                            dist(m + k, n + l, m + i, n + t - 1)
+                            dist(m + r, n + l, m + i, n + t) -
+                            dist(m + r, n + l, m + i, n - t - 1)
                         ) for i in (-r):r
                     )
             end
-            Gcurrent[r, l] = sum(
-                dist(m + k, n + l, m + i, n + j) for i in (-r):r, j in (-t):t
+            Gcurrent[r, t] = sum(
+                dist(m + r, n + t, m + i, n + j) for i in (-r):r, j in (-t):t
             )
-            Gbuf[n][:] .= Gcurrent[:]
-            u[m, n] = y[argmim(Gcurrent)]
+
+            Gbuf[n] .= Gcurrent
+            min_idx = argmin(Gcurrent)
+            u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
         end
     end
+
     return u
-
-
-
-
-
 end
 
 end
