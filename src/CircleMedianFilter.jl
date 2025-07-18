@@ -18,6 +18,7 @@ planar flow fields from optical flow, wind direction time series, and other
 data living on the unit circle.
 """
 module CircleMedianFilter
+export arc_distance_median_filter!
 
 using OffsetArrays
 

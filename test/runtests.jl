@@ -4,7 +4,12 @@ using CircleMedianFilter: d, mirror_index, arc_distance_median_filter!
 using Test
 using OffsetArrays
 
-@testset "CircleMedianFilter.jl" begin
+@testitem "CircleMedianFilter.jl" begin
+    using CircleMedianFilter
+    using CircleMedianFilter: d, mirror_index, arc_distance_median_filter!
+
+    using Test
+    using OffsetArrays
     # Write your tests here.
     @testset "Distance Function" begin
         # Test the distance function with some known values
@@ -76,7 +81,7 @@ using OffsetArrays
             arc_distance_median_filter!(u, y, 1, 1)
 
             # The outlier should be replaced with something closer to neighbors
-            @test d(u[3, 3], π / 4) < d(π, π / 4)  # Filtered value closer to neighbors than outlier
+            @test u[3, 3] == π / 4
         end
 
         @testset "Edge Cases" begin
