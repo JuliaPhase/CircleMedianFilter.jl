@@ -185,16 +185,54 @@ function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
     ## Calculate filter dimensions
     R = 2r + 1
     T = 2t + 1
-    M, N = size(y)
-
-    ## Distance function with boundary handling
-    dist(m, n, i, j) = d(mirror_index(y, m, n), mirror_index(y, i, j))
+    N = maximum(size(y))
 
     ## Allocate buffer arrays with offset indexing for natural -r:r, -t:t access
     Gbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
     Zbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
     Gcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
     Zcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
+
+    ## Delegate to core computation function
+    return _arc_distance_median_filter_core!(u, y, r, t, Gbuf, Zbuf, Gcurrent, Zcurrent)
+end
+
+"""
+    _arc_distance_median_filter_core!(u, y, r, t, Gbuf, Zbuf, Gcurrent, Zcurrent)
+
+Core computation function for arc distance median filtering.
+
+This function performs the actual filtering computation using pre-allocated buffers.
+It implements the iterative algorithm from Storath & Weinmann (2018) without
+input validation or buffer allocation overhead.
+
+## Arguments
+- `u`: Pre-allocated output array for filtered results (modified in-place)
+- `y`: Input 2D array containing circular data (angles in radians)
+- `r::Integer`: Half-width of filter in first dimension (rows)
+- `t::Integer`: Half-width of filter in second dimension (columns)
+- `Gbuf`: Vector of OffsetArrays for storing G matrices for each column
+- `Zbuf`: Vector of OffsetArrays for storing Z matrices for each column
+- `Gcurrent`: OffsetArray for current G computation
+- `Zcurrent`: OffsetArray for current Z computation
+
+## Returns
+- `u`: The filtered output array (same object as input `u`)
+
+## Notes
+This is an internal function. Use `arc_distance_median_filter!` for the public interface.
+The buffers must be properly sized: each should have dimensions (2r+1) × (2t+1) with
+offset indexing from (-r):r and (-t):t.
+
+See also: [`arc_distance_median_filter!`](@ref)
+"""
+function _arc_distance_median_filter_core!(
+    u, y, r::Integer, t::Integer, Gbuf, Zbuf, Gcurrent, Zcurrent
+)
+    M, N = size(y)
+
+    ## Distance function with boundary handling
+    dist(m, n, i, j) = d(mirror_index(y, m, n), mirror_index(y, i, j))
 
     ## Process first column (m = 1)
     m = 1
