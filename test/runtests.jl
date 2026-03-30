@@ -1,12 +1,11 @@
 using CircleMedianFilter
-using CircleMedianFilter: d, mirror_index, arc_distance_median_filter!
-
+using CircleMedianFilter: arc_distance_median_filter!, d, mirror_index
 using Test
 using OffsetArrays
 
 @testitem "CircleMedianFilter.jl" begin
     using CircleMedianFilter
-    using CircleMedianFilter: d, mirror_index, arc_distance_median_filter!
+    using CircleMedianFilter: arc_distance_median_filter!, d, mirror_index
 
     using Test
     using OffsetArrays

@@ -1,2 +1,5 @@
 /Manifest.toml
 test/Manifest.toml
+.history/src
+docs/src/examples/circular_median_demo.md
+docs/Manifest.toml
