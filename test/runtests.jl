@@ -1,14 +1,14 @@
 using CircleMedianFilter
 using CircleMedianFilter: arc_distance_median_filter!, d, mirror_index
 using Test
-using OffsetArrays
+
 
 @testitem "CircleMedianFilter.jl" begin
     using CircleMedianFilter
     using CircleMedianFilter: arc_distance_median_filter!, d, mirror_index
 
     using Test
-    using OffsetArrays
+
     # Write your tests here.
     @testset "Distance Function" begin
         # Test the distance function with some known values

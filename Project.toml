@@ -1,23 +1,19 @@
 name = "CircleMedianFilter"
 uuid = "78101540-d141-4066-b1fb-b35aa27ba915"
-authors = ["Oleg Soloviev <oleg.soloviev@gmail.com> and contributors"]
 version = "1.0.0-DEV"
-
-[deps]
-OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+authors = ["Oleg Soloviev <oleg.soloviev@gmail.com> and contributors"]
 
 [compat]
-OffsetArrays = "1.17.0"
 julia = "1.11"
 
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-PhasePlots = "5c5c3d8e-8e76-47f7-8d81-5b69e0f7f52c"
-Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+PhasePlots = "5c5c3d8e-8e76-47f7-8d81-5b69e0f7f52c"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]

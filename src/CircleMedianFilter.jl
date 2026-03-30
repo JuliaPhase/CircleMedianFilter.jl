@@ -20,37 +20,6 @@ data living on the unit circle.
 module CircleMedianFilter
 export arc_distance_median_filter!
 
-using OffsetArrays
-
-"""
-    argmin_center_bias(G)
-
-Find the argument that minimizes G, with preference for center pixel (0,0) in case of ties.
-For OffsetArrays with indices centered around (0,0), this ensures symmetric behavior.
-"""
-function argmin_center_bias(G)
-    min_val = minimum(G)
-    candidates = findall(x -> x ≈ min_val, G)
-
-    # If center (0,0) is among the candidates, choose it
-    center_idx = CartesianIndex(0, 0)
-    if center_idx in candidates
-        return center_idx
-    end
-
-    # Otherwise, choose the candidate closest to center
-    min_dist = Inf
-    best_candidate = first(candidates)
-    for candidate in candidates
-        dist_to_center = abs(candidate[1]) + abs(candidate[2])  # Manhattan distance
-        if dist_to_center < min_dist
-            min_dist = dist_to_center
-            best_candidate = candidate
-        end
-    end
-
-    return best_candidate
-end
 
 """
     d(a, b)
@@ -123,9 +92,15 @@ or periodic nature of the data being processed.
 
 See also: [`arc_distance_median_filter!`](@ref)
 """
-function mirror_index(a, i, j)
+function mirror_index(a::AbstractMatrix, i::Int, j::Int)
     ## Get the size of the array
     n, m = size(a)
+
+    return mirror_index(a, i, j, n, m)
+end
+
+function mirror_index(a::AbstractMatrix, i::Int, j::Int, n::Int, m::Int)
+
     ## Handle negative indices
     if i < 1
         i = 1 - i
@@ -162,7 +137,6 @@ to all pixels in the neighborhood, providing robust edge-preserving smoothing.
 The implementation uses:
 - Mirrored boundary conditions via `mirror_index`
 - Iterative computation of distance tables G_{m,n} for efficiency
-- OffsetArrays for natural indexing with negative indices
 
 ## Arguments
 - `u`: Pre-allocated output array for filtered results (modified in-place)
@@ -176,7 +150,6 @@ The implementation uses:
 ## Examples
 ```julia
 using CircleMedianFilter
-using OffsetArrays
 
 ## Create test phase data with some noise
 y = rand(50, 50) * 2π  ## Random phase data
@@ -214,19 +187,19 @@ function arc_distance_median_filter!(u, y, r::Integer, t::Integer)
     R = 2r + 1
     T = 2t + 1
     N = maximum(size(y))
+    Tbuf = float(promote_type(eltype(u), eltype(y)))
 
-    ## Allocate buffer arrays with offset indexing for natural -r:r, -t:t access
-    Gbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
-    Zbuf = [OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t) for _ in 1:N]
-    Gcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
-    Zcurrent = OffsetArray(zeros(Float64, R, T), (-r):r, (-t):t)
+    ## Two allocations total, matching the C reference layout:
+    ## G is a flat (R × T × N) array storing distance sums for every column.
+    ## Z is a single (R × T) array updated in-place, eliminating the N-copy Zbuf.
+    G = zeros(Tbuf, R, T, N)
+    Z = zeros(Tbuf, R, T)
 
-    ## Delegate to core computation function
-    return _arc_distance_median_filter_core!(u, y, r, t, Gbuf, Zbuf, Gcurrent, Zcurrent)
+    return _arc_distance_median_filter_core!(u, y, r, t, G, Z)
 end
 
 """
-    _arc_distance_median_filter_core!(u, y, r, t, Gbuf, Zbuf, Gcurrent, Zcurrent)
+    _arc_distance_median_filter_core!(u, y, r, t, G, Z)
 
 Core computation function for arc distance median filtering.
 
@@ -239,153 +212,150 @@ input validation or buffer allocation overhead.
 - `y`: Input 2D array containing circular data (angles in radians)
 - `r::Integer`: Half-width of filter in first dimension (rows)
 - `t::Integer`: Half-width of filter in second dimension (columns)
-- `Gbuf`: Vector of OffsetArrays for storing G matrices for each column
-- `Zbuf`: Vector of OffsetArrays for storing Z matrices for each column
-- `Gcurrent`: OffsetArray for current G computation
-- `Zcurrent`: OffsetArray for current Z computation
+- `G`: Pre-allocated `(2r+1) × (2t+1) × N` array for distance sums (one slice per column)
+- `Z`: Pre-allocated `(2r+1) × (2t+1)` auxiliary array, updated in-place each column
 
 ## Returns
 - `u`: The filtered output array (same object as input `u`)
 
 ## Notes
 This is an internal function. Use `arc_distance_median_filter!` for the public interface.
-The buffers must be properly sized: each should have dimensions (2r+1) × (2t+1) with
-offset indexing from (-r):r and (-t):t.
+The layout matches the C reference implementation: G stores all N column slices in a
+single contiguous array; Z is a single slice updated in-place (l ascending), so reading
+`Z[k, l+1]` always sees the previous column's value before `Z[k, l]` is overwritten.
 
 See also: [`arc_distance_median_filter!`](@ref)
 """
-function _arc_distance_median_filter_core!(
-    u, y, r::Integer, t::Integer, Gbuf, Zbuf, Gcurrent, Zcurrent
-)
+function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
     M, N = size(y)
+    R = 2r + 1
+    T = 2t + 1
+    Tbuf = eltype(G)
 
     ## Distance function with boundary handling
-    dist(m::Int, n::Int, i::Int, j::Int)::Float64 =
-        d(mirror_index(y, m, n), mirror_index(y, i, j))
+    ## dist(m::Int, n::Int, i::Int, j::Int)::Tbuf =
+    ##     Tbuf(d(mirror_index(y, m, n, M, N), mirror_index(y, i, j, M, N)))
 
-    ## Process first column (m = 1)
+    ## Fast arc distance: identical to the C reference.
+    ## Precondition: all values in y must be in [0, 2π).
+    ## For arbitrary-range input use d() directly instead.
+    dist(m::Int, n::Int, i::Int, j::Int)::Tbuf = begin
+        aux = abs(mirror_index(y, m, n, M, N) - mirror_index(y, i, j, M, N))
+        ifelse(aux > Tbuf(π), Tbuf(2π) - aux, aux)
+    end
+
+    ## ── First row (m = 1) ────────────────────────────────────────────────────
     let m = 1
 
-        ## Calculate first element G[1,1] by definition
+        ## G[:, :, 1] computed from scratch
         let n = 1
             for k in (-r):r
                 for l in (-t):t
-                    Gcurrent[k, l] = sum(
-                        dist(m + k, n + l, m + i, n + j) for i in (-r):r, j in (-t):t;
-                        init=0.0,
+                    G[k+r+1, l+t+1, n] = sum(
+                        dist(m+k, n+l, m+i, n+j) for i in (-r):r, j in (-t):t;
+                        init=zero(Tbuf),
                     )
                 end
             end
-            Gbuf[n] .= Gcurrent
-            ## Find median: pixel that minimizes sum of distances
-            # min_idx = argmin_center_bias(Gcurrent)
-            _, min_idx = findmin(Gcurrent)
-            u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
+            _, idx = findmin(view(G, :, :, n))
+            u[m, n] = mirror_index(y, m + idx[1] - r - 1, n + idx[2] - t - 1, M, N)
         end
-        ## Process rest of first column using iterative updates
+
+        ## G[:, :, n] for n ≥ 2: iterative column update
         for n in 2:N
             for k in (-r):r
-                for l in (-t):(t - 1)
-                    Gcurrent[k, l] =
-                        Gbuf[n - 1][k, l + 1] + sum(
-                            (
-                                dist(m + k, n + l, m + i, n + t) -
-                                dist(m + k, n + l, m + i, n - t - 1)
-                            ) for i in (-r):r;
-                            init=0.0,
+                for l in (-t):(t-1)
+                    G[k+r+1, l+t+1, n] =
+                        G[k+r+1, l+t+2, n-1] + sum(
+                            dist(m+k, n+l, m+i, n+t) - dist(m+k, n+l, m+i, n-t-1)
+                            for i in (-r):r; init=zero(Tbuf),
                         )
                 end
-                ## Handle last column separately
-                Gcurrent[k, t] = sum(
-                    dist(m + k, n + t, m + i, n + j) for i in (-r):r, j in (-t):t; init=0.0
+                ## l = t boundary
+                G[k+r+1, T, n] = sum(
+                    dist(m+k, n+t, m+i, n+j) for i in (-r):r, j in (-t):t;
+                    init=zero(Tbuf),
                 )
             end
-
-            Gbuf[n] .= Gcurrent
-            _, min_idx = findmin(Gcurrent)
-            u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
+            _, idx = findmin(view(G, :, :, n))
+            u[m, n] = mirror_index(y, m + idx[1] - r - 1, n + idx[2] - t - 1, M, N)
         end
     end
 
-    ## Process remaining rows (m >= 2)
+    ## ── Remaining rows (m ≥ 2) ───────────────────────────────────────────────
     for m in 2:M
-        ## Initialize auxiliary array Z for first element of row
+
         let n = 1
+            ## Init Z from scratch (all (k,l) computed independently)
             for k in (-r):r
                 for l in (-t):t
-                    Zbuf[n][k, l] = sum(
-                        (
-                            dist(m + k, n + l, m + r, n + j) -
-                            dist(m + k, n + l, m - r - 1, n + j)
-                        ) for j in (-t):t;
-                        init=0.0,
+                    Z[k+r+1, l+t+1] = sum(
+                        dist(m+k, n+l, m+r, n+j) - dist(m+k, n+l, m-r-1, n+j)
+                        for j in (-t):t; init=zero(Tbuf),
                     )
                 end
             end
 
-            ## Compute first element G[m,1] using previous row
-            for k in (-r):(r - 1)
+            ## Update G[:, :, 1] in-place using previous m's G[:, :, 1] and Z.
+            ## k ascending: G[k+r+2, :, n] (i.e. k+1) is read before G[k+r+1, :, n] is written.
+            for k in (-r):(r-1)
                 for l in (-t):t
-                    Gcurrent[k, l] = Gbuf[n][k + 1, l] + Zbuf[n][k, l]
+                    G[k+r+1, l+t+1, n] = G[k+r+2, l+t+1, n] + Z[k+r+1, l+t+1]
                 end
             end
-            ## Handle last row separately
+            ## k = r boundary: last row computed from scratch
             for l in (-t):t
-                Gcurrent[r, l] = sum(
-                    dist(m + r, n + l, m + i, n + j) for i in (-r):r, j in (-t):t
+                G[R, l+t+1, n] = sum(
+                    dist(m+r, n+l, m+i, n+j) for i in (-r):r, j in (-t):t;
+                    init=zero(Tbuf),
                 )
             end
-
-            Gbuf[n] .= Gcurrent
-            _, min_idx = findmin(Gcurrent)
-            u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
+            _, idx = findmin(view(G, :, :, n))
+            u[m, n] = mirror_index(y, m + idx[1] - r - 1, n + idx[2] - t - 1, M, N)
         end
-        ## Process remaining elements in current row
+
         for n in 2:N
-            ## Update Z array
+            ## Update Z in-place: l ascending ensures Z[k, l+t+2] (i.e. l+1)
+            ## still holds the previous column's value when Z[k, l+t+1] is written.
             for k in (-r):r
-                for l in (-t):(t - 1)
-                    Zcurrent[k, l] =
-                        Zbuf[n - 1][k, l + 1] + dist(m + k, n + l, m + r, n + t) -
-                        dist(m + k, n + l, m + r, n - t - 1) -
-                        dist(m + k, n + l, m - r - 1, n + t) +
-                        dist(m + k, n + l, m - r - 1, n - t - 1)
+                for l in (-t):(t-1)
+                    Z[k+r+1, l+t+1] =
+                        Z[k+r+1, l+t+2] +
+                        dist(m+k, n+l, m+r,   n+t)   -
+                        dist(m+k, n+l, m+r,   n-t-1) -
+                        dist(m+k, n+l, m-r-1, n+t)   +
+                        dist(m+k, n+l, m-r-1, n-t-1)
                 end
-                Zcurrent[k, t] = sum(
-                    (
-                        dist(m + k, n + t, m + r, n + j) -
-                        dist(m + k, n + t, m - r - 1, n + j)
-                    ) for j in (-t):t;
-                    init=0.0,
+                ## l = t boundary
+                Z[k+r+1, T] = sum(
+                    dist(m+k, n+t, m+r, n+j) - dist(m+k, n+t, m-r-1, n+j)
+                    for j in (-t):t; init=zero(Tbuf),
                 )
             end
-            Zbuf[n] .= Zcurrent
 
-            ## Compute G[m,n] using iterative relations
-            for k in (-r):(r - 1)
+            ## Update G[:, :, n] in-place using previous m's G[:, :, n] and Z.
+            for k in (-r):(r-1)
                 for l in (-t):t
-                    Gcurrent[k, l] = Gbuf[n][k + 1, l] + Zcurrent[k, l]
+                    G[k+r+1, l+t+1, n] = G[k+r+2, l+t+1, n] + Z[k+r+1, l+t+1]
                 end
             end
 
-            ## Handle last row
-            for l in (-t):(t - 1)
-                Gcurrent[r, l] =
-                    Gbuf[n - 1][r, l + 1] + sum(
-                        (
-                            dist(m + r, n + l, m + i, n + t) -
-                            dist(m + r, n + l, m + i, n - t - 1)
-                        ) for i in (-r):r;
-                        init=0.0,
+            ## k = r, l in -t:t-1: use previous column's G (n-1) iteratively
+            for l in (-t):(t-1)
+                G[R, l+t+1, n] =
+                    G[R, l+t+2, n-1] + sum(
+                        dist(m+r, n+l, m+i, n+t) - dist(m+r, n+l, m+i, n-t-1)
+                        for i in (-r):r; init=zero(Tbuf),
                     )
             end
-            Gcurrent[r, t] = sum(
-                dist(m + r, n + t, m + i, n + j) for i in (-r):r, j in (-t):t; init=0.0
+            ## k = r, l = t: full sum from scratch
+            G[R, T, n] = sum(
+                dist(m+r, n+t, m+i, n+j) for i in (-r):r, j in (-t):t;
+                init=zero(Tbuf),
             )
 
-            Gbuf[n] .= Gcurrent
-            _, min_idx = findmin(Gcurrent)
-            u[m, n] = mirror_index(y, m + min_idx[1], n + min_idx[2])
+            _, idx = findmin(view(G, :, :, n))
+            u[m, n] = mirror_index(y, m + idx[1] - r - 1, n + idx[2] - t - 1, M, N)
         end
     end
 
