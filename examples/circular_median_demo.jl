@@ -10,6 +10,7 @@ using CircleMedianFilter
 using CairoMakie
 using Statistics
 using Random
+using PrettyTables
 
 # # Circular Median Filter Demonstration
 #
@@ -28,180 +29,12 @@ using Random
 # 4. **Quantitative Analysis**: Measuring improvement in terms of phase error
 
 #=
-## Helper Functions
-
-First, we define utility functions for creating test patterns and adding noise:
-=#
-
-"""
-    add_concentric_circles!(phase_array, X, Y, center_x, center_y, radii, phases)
-
-Add concentric circles with different phase values to a phase array.
-
-## Arguments
-- `phase_array`: Input phase array to be modified (modified in-place)
-- `X`, `Y`: Coordinate grids for the image
-- `center_x`, `center_y`: Center coordinates for the circles
-- `radii`: Vector of radius pairs [(r1_inner, r1_outer), (r2_inner, r2_outer), ...]
-- `phases`: Vector of phase values for each ring
-
-## Returns
-- The modified `phase_array` with circles added
-"""
-function add_concentric_circles!(phase_array, X, Y, center_x, center_y, radii, phases)
-    for (i, ((r_inner, r_outer), phase)) in enumerate(zip(radii, phases))
-        circle_mask =
-            ((X .- center_x) .^ 2 + (Y .- center_y) .^ 2 .>= r_inner^2) .&
-            ((X .- center_x) .^ 2 + (Y .- center_y) .^ 2 .<= r_outer^2)
-        phase_array[circle_mask] .= phase
-    end
-    return phase_array
-end
-
-"""
-    add_phase_noise!(phase_array, noise_fraction::Float64, gaussian_std::Float64=0.1)
-
-Add salt-and-pepper noise and Gaussian noise to a phase array.
-
-## Arguments
-- `phase_array`: Input phase array to be corrupted with noise (modified in-place)
-- `noise_fraction`: Fraction of pixels to corrupt with salt-and-pepper noise (0.0 to 1.0)
-- `gaussian_std`: Standard deviation of Gaussian noise to add to all pixels (default: 0.1)
-
-## Returns
-- The modified `phase_array` with noise added, wrapped to [0, 2π] range
-"""
-function add_phase_noise!(phase_array, noise_fraction::Float64, gaussian_std::Float64=0.1)
-    ## Add salt-and-pepper noise (random phase jumps)
-    noise_mask = rand(size(phase_array)...) .< noise_fraction
-    phase_array[noise_mask] .= rand(sum(noise_mask)) .* 2π
-
-    ## Add Gaussian noise to all pixels
-    gaussian_noise = gaussian_std * randn(size(phase_array)...)
-    phase_array .+= gaussian_noise
-
-    ## Wrap phase to [0, 2π] range
-    phase_array .= mod.(phase_array, 2π)
-
-    return phase_array
-end
-
-#=
 ## Creating Test Phase Data
 
 We create a complex synthetic phase image with multiple challenging features:
 =#
 
-## Create a test phase from several concentric circles, wedge, and rectangles and add noise
-gt_phase = zeros(512, 512)
-
-## Get image dimensions and center coordinates
-ny, nx = size(gt_phase)
-cx, cy = nx ÷ 2, ny ÷ 2
-
-## Create coordinate grids
-x = 1:nx
-y = 1:ny
-X = repeat(x', ny, 1)
-Y = repeat(y, 1, nx)
-
-#=
-### 1. Checkerboard Pattern (Top-Left Quadrant)
-
-First, we add a checkerboard pattern to test the filter's behavior on sharp transitions:
-=#
-
-## Add rectangular regions first
-## Rectangle 1: top-left quadrant with checkerboard pattern, 8x8 cells
-rect_mask1 = (X .<= cx) .& (Y .<= cy)
-if any(rect_mask1)
-    ## Find the bounding box of the rectangular region
-    rect_indices = findall(rect_mask1)
-    min_x = minimum(getindex.(Tuple.(rect_indices), 2))
-    max_x = maximum(getindex.(Tuple.(rect_indices), 2))
-    min_y = minimum(getindex.(Tuple.(rect_indices), 1))
-    max_y = maximum(getindex.(Tuple.(rect_indices), 1))
-
-    ## Create 8x8 checkerboard pattern within the rectangle
-    cell_width = (max_x - min_x + 1) / 8
-    cell_height = (max_y - min_y + 1) / 8
-
-    for (i, idx) in enumerate(rect_indices)
-        row, col = Tuple(idx)
-        ## Determine which cell this pixel belongs to
-        cell_row = min(7, floor(Int, (row - min_y) / cell_height))
-        cell_col = min(7, floor(Int, (col - min_x) / cell_width))
-
-        ## Checkerboard pattern: alternate between two phase values
-        if (cell_row + cell_col) % 2 == 0
-            gt_phase[row, col] = π / 4      ## Light squares
-        else
-            gt_phase[row, col] = 7π / 4     ## Dark squares
-        end
-    end
-end
-
-#=
-### 2. Background Region (Bottom-Right Quadrant)
-
-Set a uniform background for the concentric circles:
-=#
-
-## Rectangle 2: bottom-right quadrant, phase = 5π/6 (background for circles)
-rect_mask2 = (X .>= cx) .& (Y .>= cy)
-gt_phase[rect_mask2] .= 5π / 6
-
-#=
-### 3. Concentric Circles
-
-Add concentric circles with increasing phase values to create smooth gradients with sharp boundaries:
-=#
-
-## Add concentric circles (larger, centered in bottom-right quadrant) - AFTER rectangles
-## Position circles at center of bottom-right quadrant
-circle_cx, circle_cy = cx + cx ÷ 2, cy + cy ÷ 2  ## Center of bottom-right quadrant
-
-## Calculate quadrant size and make circles 90% of quadrant radius
-quadrant_radius = min(cx ÷ 2, cy ÷ 2)  ## Half of quadrant dimension
-max_circle_radius = Int(round(0.9 * quadrant_radius))  ## 90% of quadrant radius
-
-## Create 6 concentric circles with 2×2π total phase change
-num_circles = 6
-circle_radii = [
-    (
-        Int(round(i * max_circle_radius / num_circles)),
-        Int(round((i + 1) * max_circle_radius / num_circles)),
-    ) for i in 0:(num_circles - 1)
-]
-## Phase values spanning 2×2π = 4π total, evenly distributed
-circle_phases = [i * 4π / num_circles for i in 0:(num_circles - 1)]
-add_concentric_circles!(gt_phase, X, Y, circle_cx, circle_cy, circle_radii, circle_phases)
-
-#=
-### 4. Phase Gradient Stripes
-
-Add horizontal stripes with different phase gradients to test handling of rapid phase changes:
-=#
-
-## Add some sharp phase boundaries to test discontinuity handling
-## Three horizontal stripes with different phase gradients
-## Stripe 1: Moderate gradient (2π total growth)
-stripe_mask1 = (Y .>= cy - 40) .& (Y .<= cy - 10) .& (X .>= cx - 100) .& (X .<= cx + 100)
-stripe_phase1 = (X .- (cx - 100)) ./ 200 .* 2π  ## Linear gradient from 0 to 2π
-gt_phase[stripe_mask1] .= stripe_phase1[stripe_mask1]
-
-## Stripe 2: Higher gradient (3 × 2π total growth)
-stripe_mask2 = (Y .>= cy - 10) .& (Y .<= cy + 10) .& (X .>= cx - 100) .& (X .<= cx + 100)
-stripe_phase2 = (X .- (cx - 100)) ./ 200 .* 6π  ## Linear gradient from 0 to 6π
-gt_phase[stripe_mask2] .= stripe_phase2[stripe_mask2]
-
-## Stripe 3: Very high gradient (10 × 2π total growth) - original stripe
-stripe_mask3 = (Y .>= cy + 10) .& (Y .<= cy + 40) .& (X .>= cx - 100) .& (X .<= cx + 100)
-stripe_phase3 = (X .- (cx - 100)) ./ 200 .* 20π  ## Linear gradient from 0 to 20π
-gt_phase[stripe_mask3] .= stripe_phase3[stripe_mask3]
-
-## Wrap all phases to [0, 2π] to create realistic phase discontinuities
-gt_phase .= mod.(gt_phase, 2π)
+gt_phase = CircleMedianFilter.create_test_phase()
 
 #=
 ## Filter Performance Analysis
@@ -213,9 +46,9 @@ Now we test the filter performance across different noise levels and filter size
 Random.seed!(42)  ## For reproducible results
 
 ## Test different noise levels
-noise_levels = [0.05, 0.25, 0.5, 0.75]
-gaussian_levels = [0.1, 0.03]  ## Test two levels of Gaussian noise
-filter_radii = [1, 2, 3]  ## This creates 3×3, 5×5, and 7×7 filters
+const noise_levels = [0.05, 0.25, 0.5, 0.75]
+const gaussian_levels = [0.1, 0.03]  ## Test two levels of Gaussian noise
+const filter_radii = [1, 2, 3]  ## This creates 3×3, 5×5, and 7×7 filters
 
 println("Testing circular median filter performance...")
 println("Noise levels: ", noise_levels)
@@ -235,7 +68,7 @@ filter_radius = 2 # 5×5 filter
 
 ## Create noisy version
 noisy_phase = copy(gt_phase)
-add_phase_noise!(noisy_phase, noise_fraction, gaussian_std)
+CircleMedianFilter.add_phase_noise!(noisy_phase, noise_fraction, gaussian_std);
 
 ## Apply circular median filter
 filtered_phase = similar(noisy_phase)
@@ -307,6 +140,117 @@ println("  Mean error (filtered): $(round(mean_error_filtered, digits=4)) radian
 println(
     "  Improvement: $(round((mean_error_noisy - mean_error_filtered) / mean_error_noisy * 100, digits=2))%",
 )
+
+#=
+## Noise-Reduction Summary Table
+
+Compute noise-reduction statistics for multiple noise settings and filter sizes,
+then print a compact results table.
+=#
+
+summary_rows = NamedTuple[]
+
+for noise_fraction in noise_levels
+    for gaussian_std in gaussian_levels
+        noisy = copy(gt_phase)
+        CircleMedianFilter.add_phase_noise!(noisy, noise_fraction, gaussian_std)
+
+        for r in filter_radii
+            filtered = similar(noisy)
+            arc_distance_median_filter!(filtered, noisy, r, r)
+
+            err_noisy = CircleMedianFilter.d.(gt_phase, noisy)
+            err_filtered = CircleMedianFilter.d.(gt_phase, filtered)
+
+            mean_noisy = mean(err_noisy)
+            mean_filtered = mean(err_filtered)
+            improvement = 100 * (mean_noisy - mean_filtered) / mean_noisy
+
+            push!(
+                summary_rows,
+                (
+                    salt_pepper=noise_fraction,
+                    gaussian_sigma=gaussian_std,
+                    filter_size=2r + 1,
+                    mean_error_noisy=mean_noisy,
+                    mean_error_filtered=mean_filtered,
+                    improvement_pct=improvement,
+                ),
+            )
+        end
+    end
+end
+
+tablestr = pretty_table(
+    summary_rows;
+    backend=:html,
+    formatters=[fmt__round(4, [4, 5]), fmt__round(2, [1, 2, 6])],
+)
+
+Base.HTML(tablestr)
+
+
+
+#=
+## Runtime Benchmark Across Filter Sizes (Log-Scale)
+
+Measure runtime versus filter size for two image resolutions and visualize the
+results on a log-scale y-axis.
+=#
+
+function median_runtime_seconds(input_phase, r; repeats=5)
+    out = similar(input_phase)
+
+    ## Warmup to avoid first-call compilation costs in timing loop.
+    arc_distance_median_filter!(out, input_phase, r, r)
+
+    times = Float64[]
+    for _ in 1:repeats
+        t = @elapsed arc_distance_median_filter!(out, input_phase, r, r)
+        push!(times, t)
+    end
+    return median(times)
+end
+
+const benchmark_radii = 1:15  ## 3x3 up to 31x31
+const benchmark_sizes = [256, 512]
+
+benchmark_inputs = Dict{Int,Matrix{Float64}}()
+for n in benchmark_sizes
+    phase = CircleMedianFilter.create_test_phase(n, n)
+    CircleMedianFilter.add_phase_noise!(phase, 0.25, 0.1)
+    benchmark_inputs[n] = phase
+end
+
+runtime_results = Dict{Int,Vector{Float64}}()
+for n in benchmark_sizes
+    runtime_results[n] = [
+        median_runtime_seconds(benchmark_inputs[n], r) for r in benchmark_radii
+    ]
+end
+
+
+xvals = [(2r + 1)^2 for r in benchmark_radii]
+runtime_fig = Figure(; size=(900, 500))
+runtime_ax = Axis(
+    runtime_fig[1, 1];
+    title="Runtime vs Number of Filter-Mask Elements",
+    xlabel="Number of elements in filter mask",
+    ylabel="Runtime [s]",
+    xscale=log10,
+    yscale=log10,
+    xticks=xvals,
+)
+
+
+for n in benchmark_sizes
+    scatterlines!(
+        runtime_ax, xvals, runtime_results[n]; label="$(n)x$(n)", linewidth=2, markersize=8
+    )
+end
+
+axislegend(runtime_ax; position=:lt)
+runtime_fig
 
 #=
 ## Key Observations

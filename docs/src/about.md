@@ -6,7 +6,7 @@ CircleMedianFilter.jl addresses a fundamental challenge in signal and image proc
 
 ## The Problem with Standard Median Filtering
 
-Consider phase values near the wraparound point (e.g., 0.1, 6.2, 0.05 radians). A standard median filter might return a value around 3.1 radians, which is completely wrong—the correct median should be close to 0.0 radians. This happens because standard algorithms don't understand that 6.2 radians is actually very close to 0.1 radians on the unit circle.
+Consider phase values near the wraparound point (e.g., 0.3, 6.2, 0.05 radians). A standard median filter might return a value around 0.3 radians, which is completely wrong, as the correct median should be close to 0.05 radians. This happens because standard algorithms don't understand that 6.2 radians is actually something about -0.08 radians on the unit circle.
 
 ## The Solution: Arc Distance Median
 

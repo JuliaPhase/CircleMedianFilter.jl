@@ -251,8 +251,8 @@ function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
         let n = 1
             for k in (-r):r
                 for l in (-t):t
-                    G[k+r+1, l+t+1, n] = sum(
-                        dist(m+k, n+l, m+i, n+j) for i in (-r):r, j in (-t):t;
+                    G[k + r + 1, l + t + 1, n] = sum(
+                        dist(m + k, n + l, m + i, n + j) for i in (-r):r, j in (-t):t;
                         init=zero(Tbuf),
                     )
                 end
@@ -264,16 +264,17 @@ function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
         ## G[:, :, n] for n ≥ 2: iterative column update
         for n in 2:N
             for k in (-r):r
-                for l in (-t):(t-1)
-                    G[k+r+1, l+t+1, n] =
-                        G[k+r+1, l+t+2, n-1] + sum(
-                            dist(m+k, n+l, m+i, n+t) - dist(m+k, n+l, m+i, n-t-1)
-                            for i in (-r):r; init=zero(Tbuf),
+                for l in (-t):(t - 1)
+                    G[k + r + 1, l + t + 1, n] =
+                        G[k + r + 1, l + t + 2, n - 1] + sum(
+                            dist(m + k, n + l, m + i, n + t) -
+                            dist(m + k, n + l, m + i, n - t - 1) for i in (-r):r;
+                            init=zero(Tbuf),
                         )
                 end
                 ## l = t boundary
-                G[k+r+1, T, n] = sum(
-                    dist(m+k, n+t, m+i, n+j) for i in (-r):r, j in (-t):t;
+                G[k + r + 1, T, n] = sum(
+                    dist(m + k, n + t, m + i, n + j) for i in (-r):r, j in (-t):t;
                     init=zero(Tbuf),
                 )
             end
@@ -289,24 +290,26 @@ function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
             ## Init Z from scratch (all (k,l) computed independently)
             for k in (-r):r
                 for l in (-t):t
-                    Z[k+r+1, l+t+1] = sum(
-                        dist(m+k, n+l, m+r, n+j) - dist(m+k, n+l, m-r-1, n+j)
-                        for j in (-t):t; init=zero(Tbuf),
+                    Z[k + r + 1, l + t + 1] = sum(
+                        dist(m + k, n + l, m + r, n + j) -
+                        dist(m + k, n + l, m - r - 1, n + j) for j in (-t):t;
+                        init=zero(Tbuf),
                     )
                 end
             end
 
             ## Update G[:, :, 1] in-place using previous m's G[:, :, 1] and Z.
             ## k ascending: G[k+r+2, :, n] (i.e. k+1) is read before G[k+r+1, :, n] is written.
-            for k in (-r):(r-1)
+            for k in (-r):(r - 1)
                 for l in (-t):t
-                    G[k+r+1, l+t+1, n] = G[k+r+2, l+t+1, n] + Z[k+r+1, l+t+1]
+                    G[k + r + 1, l + t + 1, n] =
+                        G[k + r + 2, l + t + 1, n] + Z[k + r + 1, l + t + 1]
                 end
             end
             ## k = r boundary: last row computed from scratch
             for l in (-t):t
-                G[R, l+t+1, n] = sum(
-                    dist(m+r, n+l, m+i, n+j) for i in (-r):r, j in (-t):t;
+                G[R, l + t + 1, n] = sum(
+                    dist(m + r, n + l, m + i, n + j) for i in (-r):r, j in (-t):t;
                     init=zero(Tbuf),
                 )
             end
@@ -318,39 +321,41 @@ function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
             ## Update Z in-place: l ascending ensures Z[k, l+t+2] (i.e. l+1)
             ## still holds the previous column's value when Z[k, l+t+1] is written.
             for k in (-r):r
-                for l in (-t):(t-1)
-                    Z[k+r+1, l+t+1] =
-                        Z[k+r+1, l+t+2] +
-                        dist(m+k, n+l, m+r,   n+t)   -
-                        dist(m+k, n+l, m+r,   n-t-1) -
-                        dist(m+k, n+l, m-r-1, n+t)   +
-                        dist(m+k, n+l, m-r-1, n-t-1)
+                for l in (-t):(t - 1)
+                    Z[k + r + 1, l + t + 1] =
+                        Z[k + r + 1, l + t + 2] + dist(m + k, n + l, m + r, n + t) -
+                        dist(m + k, n + l, m + r, n - t - 1) -
+                        dist(m + k, n + l, m - r - 1, n + t) +
+                        dist(m + k, n + l, m - r - 1, n - t - 1)
                 end
                 ## l = t boundary
-                Z[k+r+1, T] = sum(
-                    dist(m+k, n+t, m+r, n+j) - dist(m+k, n+t, m-r-1, n+j)
-                    for j in (-t):t; init=zero(Tbuf),
+                Z[k + r + 1, T] = sum(
+                    dist(m + k, n + t, m + r, n + j) - dist(m + k, n + t, m - r - 1, n + j)
+                    for j in (-t):t;
+                    init=zero(Tbuf),
                 )
             end
 
             ## Update G[:, :, n] in-place using previous m's G[:, :, n] and Z.
-            for k in (-r):(r-1)
+            for k in (-r):(r - 1)
                 for l in (-t):t
-                    G[k+r+1, l+t+1, n] = G[k+r+2, l+t+1, n] + Z[k+r+1, l+t+1]
+                    G[k + r + 1, l + t + 1, n] =
+                        G[k + r + 2, l + t + 1, n] + Z[k + r + 1, l + t + 1]
                 end
             end
 
             ## k = r, l in -t:t-1: use previous column's G (n-1) iteratively
-            for l in (-t):(t-1)
-                G[R, l+t+1, n] =
-                    G[R, l+t+2, n-1] + sum(
-                        dist(m+r, n+l, m+i, n+t) - dist(m+r, n+l, m+i, n-t-1)
-                        for i in (-r):r; init=zero(Tbuf),
+            for l in (-t):(t - 1)
+                G[R, l + t + 1, n] =
+                    G[R, l + t + 2, n - 1] + sum(
+                        dist(m + r, n + l, m + i, n + t) -
+                        dist(m + r, n + l, m + i, n - t - 1) for i in (-r):r;
+                        init=zero(Tbuf),
                     )
             end
             ## k = r, l = t: full sum from scratch
             G[R, T, n] = sum(
-                dist(m+r, n+t, m+i, n+j) for i in (-r):r, j in (-t):t;
+                dist(m + r, n + t, m + i, n + j) for i in (-r):r, j in (-t):t;
                 init=zero(Tbuf),
             )
 
@@ -361,5 +366,7 @@ function _arc_distance_median_filter_core!(u, y, r::Integer, t::Integer, G, Z)
 
     return u
 end
+
+include("demo_utils.jl")
 
 end
