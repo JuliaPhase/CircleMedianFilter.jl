@@ -1,6 +1,6 @@
 name = "CircleMedianFilter"
 uuid = "78101540-d141-4066-b1fb-b35aa27ba915"
-version = "1.0.0-DEV"
+version = "0.1.0"
 authors = ["Oleg Soloviev <oleg.soloviev@gmail.com> and contributors"]
 
 [compat]

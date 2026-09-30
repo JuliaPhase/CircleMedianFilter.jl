@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "CircleMedianFilter.jl"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - family-names: "Soloviev"
+    given-names: "Oleg"
+    email: "oleg.soloviev@gmail.com"
+    orcid: "https://orcid.org/0000-0003-3761-9192"
+    affiliation: "Flexible Optical B.V. (OKO Technologies)"
+abstract: "Julia implementation of fast median filtering for circular data (phase images, orientation fields, angular measurements) based on the arc distance median algorithm of Storath and Weinmann."
+keywords:
+  - "median filter"
+  - "circular data"
+  - "phase image"
+  - "phase unwrapping"
+  - "Julia"
+license: MIT
+repository-code: "https://github.com/olejorik/CircleMedianFilter.jl"
+version: "0.1.0"

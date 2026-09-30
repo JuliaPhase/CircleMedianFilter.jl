@@ -1,5 +1,9 @@
 # CircleMedianFilter.jl
 
+Part of the [Phase.jl](https://github.com/JuliaPhase/Phase.jl) ecosystem.
+
+<!-- DOI badge: add after first Zenodo release -->
+
 [![Build Status](https://github.com/olejorik/CircleMedianFilter.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/olejorik/CircleMedianFilter.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://olejorik.github.io/CircleMedianFilter.jl/stable/)
 [![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://olejorik.github.io/CircleMedianFilter.jl/dev/)
@@ -59,3 +63,9 @@ DOI: [10.1109/TPAMI.2017.2692779](https://doi.org/10.1109/TPAMI.2017.2692779)
 For detailed documentation, examples, and API reference, visit:
 - [**Stable Documentation**](https://olejorik.github.io/CircleMedianFilter.jl/stable/)
 - [**Development Documentation**](https://olejorik.github.io/CircleMedianFilter.jl/dev/)
+
+## Funding
+
+This work has received funding from the Chips Joint Undertaking (JU) under grant agreement No 101111948 (14AMI). The JU receives support from the European Union's Horizon Europe research and innovation programme. The project is supported by the Chips Joint Undertaking and its members including the top-up funding by RVO (The Netherlands Enterprise Agency).
+
+<img src="docs/src/assets/funding/Chips-JU.png" alt="Chips Joint Undertaking, co-funded by the European Union" height="60">

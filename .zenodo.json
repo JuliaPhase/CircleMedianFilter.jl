@@ -1,0 +1,27 @@
+{
+  "title": "CircleMedianFilter.jl",
+  "upload_type": "software",
+  "description": "<p>Julia implementation of fast median filtering for circular data (phase images, orientation fields, angular measurements) based on the arc distance median algorithm of Storath and Weinmann.</p>",
+  "creators": [
+    {
+      "name": "Soloviev, Oleg",
+      "affiliation": "Flexible Optical B.V. (OKO Technologies)",
+      "orcid": "0000-0003-3761-9192"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "version": "0.1.0",
+  "keywords": [
+    "median filter",
+    "circular data",
+    "phase image",
+    "phase unwrapping",
+    "Julia"
+  ],
+  "grants": [
+    {
+      "id": "10.13039/501100000780::101111948"
+    }
+  ]
+}
