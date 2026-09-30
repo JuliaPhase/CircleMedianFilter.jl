@@ -30,11 +30,11 @@ makedocs(;
     sitename="CircleMedianFilter.jl",
     modules=[CircleMedianFilter],
     authors="Oleg Soloviev",
-    repo="https://github.com/olejorik/CircleMedianFilter.jl/blob/{commit}{path}#L{line}",
+    repo="https://github.com/JuliaPhase/CircleMedianFilter.jl/blob/{commit}{path}#L{line}",
     checkdocs=:exports,
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://olejorik.github.io/CircleMedianFilter.jl/stable/",
+        canonical="https://juliaphase.github.io/CircleMedianFilter.jl/stable/",
         assets=["assets/favicon.ico"],
         highlights=["yaml"],
     ),
@@ -47,7 +47,4 @@ makedocs(;
     ],
 )
 
-# Uncomment for deployment to GitHub Pages
-# deploydocs(
-#     repo = "github.com/olejorik/CircleMedianFilter.jl.git",
-# )
+deploydocs(; repo="github.com/JuliaPhase/CircleMedianFilter.jl.git", devbranch="main")

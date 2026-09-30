@@ -8,7 +8,7 @@ CircleMedianFilter.jl provides efficient implementations of median filtering alg
 
 **"Fast Median Filtering for Phase or Orientation Data"** by Martin Storath and Andreas Weinmann
 *IEEE Transactions on Pattern Analysis and Machine Intelligence*, Vol. 40, No. 3, March 2018
-DOI: [10.1109/TPAMI.2017.2692779](https://doi.org/10.1109/TPAMI.2017.2692779)
+DOI: [10.1109/TPAMI.2017.2692779](https://doi.org/10.1109/TPAMI.2017.2692779); see the original Matlab implementation on publication [github repo](https://github.com/mstorath/CircleMedianFilter).
 
 ## Key Features
 
@@ -44,3 +44,9 @@ arc_distance_median_filter!(filtered_data, phase_data, 1, 1)  # radius_x=1, radi
 ## Index
 ```@index
 ```
+
+## Funding
+
+This work has received funding from the Chips Joint Undertaking (JU) under grant agreement No 101111948 (14AMI). The JU receives support from the European Union's Horizon Europe research and innovation programme. The project is supported by the Chips Joint Undertaking and its members including the top-up funding by RVO (The Netherlands Enterprise Agency).
+
+<img src="assets/funding/Chips-JU.png" alt="Chips Joint Undertaking, co-funded by the European Union" height="60">

@@ -4,9 +4,9 @@ Part of the [Phase.jl](https://github.com/JuliaPhase/Phase.jl) ecosystem.
 
 <!-- DOI badge: add after first Zenodo release -->
 
-[![Build Status](https://github.com/olejorik/CircleMedianFilter.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/olejorik/CircleMedianFilter.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://olejorik.github.io/CircleMedianFilter.jl/stable/)
-[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://olejorik.github.io/CircleMedianFilter.jl/dev/)
+[![Build Status](https://github.com/JuliaPhase/CircleMedianFilter.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaPhase/CircleMedianFilter.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliaphase.github.io/CircleMedianFilter.jl/stable/)
+[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://juliaphase.github.io/CircleMedianFilter.jl/dev/)
 
 A Julia implementation of fast median filtering algorithms for circular data (phase images, orientation fields, angular measurements).
 
@@ -61,8 +61,8 @@ DOI: [10.1109/TPAMI.2017.2692779](https://doi.org/10.1109/TPAMI.2017.2692779)
 ## Documentation
 
 For detailed documentation, examples, and API reference, visit:
-- [**Stable Documentation**](https://olejorik.github.io/CircleMedianFilter.jl/stable/)
-- [**Development Documentation**](https://olejorik.github.io/CircleMedianFilter.jl/dev/)
+- [**Stable Documentation**](https://juliaphase.github.io/CircleMedianFilter.jl/stable/)
+- [**Development Documentation**](https://juliaphase.github.io/CircleMedianFilter.jl/dev/)
 
 ## Funding
 

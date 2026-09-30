@@ -16,5 +16,5 @@ keywords:
   - "phase unwrapping"
   - "Julia"
 license: MIT
-repository-code: "https://github.com/olejorik/CircleMedianFilter.jl"
+repository-code: "https://github.com/JuliaPhase/CircleMedianFilter.jl"
 version: "0.1.0"
