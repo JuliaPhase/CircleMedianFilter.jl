@@ -1,3 +1,4 @@
+using TestItemRunner
 using CircleMedianFilter
 using CircleMedianFilter: arc_distance_median_filter!, d, mirror_index
 using Test
@@ -124,3 +125,5 @@ using Test
         end
     end
 end
+
+@run_package_tests
