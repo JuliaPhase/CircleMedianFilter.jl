@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Circular Median Filter Demonstration · CircleMedianFilter.jl</title><meta name="title" content="Circular Median Filter Demonstration · CircleMedianFilter.jl"/><meta property="og:title" content="Circular Median Filter Demonstration · CircleMedianFilter.jl"/><meta property="twitter:title" content="Circular Median Filter Demonstration · CircleMedianFilter.jl"/><meta name="description" content="Documentation for CircleMedianFilter.jl."/><meta property="og:description" content="Documentation for CircleMedianFilter.jl."/><meta property="twitter:description" content="Documentation for CircleMedianFilter.jl."/><meta property="og:url" content="https://juliaphase.github.io/CircleMedianFilter.jl/stable/examples/circular_median_demo/"/><meta property="twitter:url" content="https://juliaphase.github.io/CircleMedianFilter.jl/stable/examples/circular_median_demo/"/><link rel="canonical" href="https://juliaphase.github.io/CircleMedianFilter.jl/stable/examples/circular_median_demo/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">CircleMedianFilter.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../about/">About</a></li><li><a class="tocitem" href="../../api/">API Reference</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Circular Median Filter Demonstration</a><ul class="internal"><li><a class="tocitem" href="#Overview"><span>Overview</span></a></li><li><a class="tocitem" href="#Creating-Test-Phase-Data"><span>Creating Test Phase Data</span></a></li><li><a class="tocitem" href="#Filter-Performance-Analysis"><span>Filter Performance Analysis</span></a></li><li><a class="tocitem" href="#Noise-Reduction-Summary-Table"><span>Noise-Reduction Summary Table</span></a></li><li><a class="tocitem" href="#Runtime-Benchmark-Across-Filter-Sizes-(Log-Scale)"><span>Runtime Benchmark Across Filter Sizes (Log-Scale)</span></a></li><li><a class="tocitem" href="#Key-Observations"><span>Key Observations</span></a></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Circular Median Filter Demonstration</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Circular Median Filter Demonstration</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaPhase/CircleMedianFilter.jl/blob/main/examples/circular_median_demo.jl#L" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><pre><code class="language-julia hljs">using CircleMedianFilter
+using CairoMakie
+using Statistics
+using Random
+using PrettyTables</code></pre><h1 id="Circular-Median-Filter-Demonstration"><a class="docs-heading-anchor" href="#Circular-Median-Filter-Demonstration">Circular Median Filter Demonstration</a><a id="Circular-Median-Filter-Demonstration-1"></a><a class="docs-heading-anchor-permalink" href="#Circular-Median-Filter-Demonstration" title="Permalink"></a></h1><p>This example demonstrates the effectiveness of circular median filtering for phase data containing various types of noise and discontinuities.</p><h2 id="Overview"><a class="docs-heading-anchor" href="#Overview">Overview</a><a id="Overview-1"></a><a class="docs-heading-anchor-permalink" href="#Overview" title="Permalink"></a></h2><p>The circular median filter is specifically designed for circular data (like phase images) where standard median filtering fails due to the wraparound nature of angular data. This demo shows:</p><ol><li><strong>Synthetic Phase Generation</strong>: Creating test phase patterns with circles, stripes, and checkerboards</li><li><strong>Noise Addition</strong>: Adding salt-and-pepper and Gaussian noise</li><li><strong>Filter Performance</strong>: Comparing results across different filter sizes and noise levels</li><li><strong>Quantitative Analysis</strong>: Measuring improvement in terms of phase error</li></ol><h2 id="Creating-Test-Phase-Data"><a class="docs-heading-anchor" href="#Creating-Test-Phase-Data">Creating Test Phase Data</a><a id="Creating-Test-Phase-Data-1"></a><a class="docs-heading-anchor-permalink" href="#Creating-Test-Phase-Data" title="Permalink"></a></h2><p>We create a complex synthetic phase image with multiple challenging features:</p><pre><code class="language-julia hljs">gt_phase = CircleMedianFilter.create_test_phase()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">512×512 Matrix{Float64}:
+ 0.785398  0.785398  0.785398  …  0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398  …  0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ 0.785398  0.785398  0.785398     0.0      0.0      0.0      0.0
+ ⋮                             ⋱                    ⋮        
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0       …  2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0       …  2.61799  2.61799  2.61799  2.61799
+ 0.0       0.0       0.0          2.61799  2.61799  2.61799  2.61799</code></pre><h2 id="Filter-Performance-Analysis"><a class="docs-heading-anchor" href="#Filter-Performance-Analysis">Filter Performance Analysis</a><a id="Filter-Performance-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Filter-Performance-Analysis" title="Permalink"></a></h2><p>Now we test the filter performance across different noise levels and filter sizes:</p><pre><code class="language-julia hljs"># Add random noise to the phase
+Random.seed!(42)  ## For reproducible results
+
+# Test different noise levels
+const noise_levels = [0.05, 0.25, 0.5, 0.75]
+const gaussian_levels = [0.1, 0.03]  ## Test two levels of Gaussian noise
+const filter_radii = [1, 2, 3]  ## This creates 3×3, 5×5, and 7×7 filters
+
+println(&quot;Testing circular median filter performance...&quot;)
+println(&quot;Noise levels: &quot;, noise_levels)
+println(&quot;Gaussian levels: &quot;, gaussian_levels)
+println(&quot;Filter sizes: &quot;, [2r + 1 for r in filter_radii])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Testing circular median filter performance...
+Noise levels: [0.05, 0.25, 0.5, 0.75]
+Gaussian levels: [0.1, 0.03]
+Filter sizes: [3, 5, 7]</code></pre><h3 id="Example:-Single-Demonstration"><a class="docs-heading-anchor" href="#Example:-Single-Demonstration">Example: Single Demonstration</a><a id="Example:-Single-Demonstration-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-Single-Demonstration" title="Permalink"></a></h3><p>Let&#39;s show a detailed example with moderate noise:</p><pre><code class="language-julia hljs"># Example with moderate noise level
+noise_fraction = 0.25
+gaussian_std = 0.1
+filter_radius = 2 # 5×5 filter
+
+# Create noisy version
+noisy_phase = copy(gt_phase)
+CircleMedianFilter.add_phase_noise!(noisy_phase, noise_fraction, gaussian_std);
+
+# Apply circular median filter
+filtered_phase = similar(noisy_phase)
+arc_distance_median_filter!(filtered_phase, noisy_phase, filter_radius, filter_radius)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">512×512 Matrix{Float64}:
+ 0.74925   0.755261  0.755261  …  0.00130695  6.24646    6.24646
+ 0.731951  0.74925   0.755261     6.24646     6.2453     6.2453
+ 0.74925   0.755261  0.772096     6.24646     6.24646    0.0119377
+ 0.755261  0.755261  0.772096     6.24646     6.2639     0.0119377
+ 0.790225  0.810944  0.810944     6.2639      0.0302703  0.0406464
+ 0.851877  0.83182   0.83182   …  6.24563     0.0302703  0.0406464
+ 0.85618   0.848271  0.848271     0.0302703   0.0406464  0.0482777
+ 0.83182   0.83182   0.790225     6.23961     6.2639     6.2639
+ 0.790225  0.790225  0.779428     6.22192     6.26175    6.24225
+ 0.750821  0.750788  0.756141     6.18584     6.22192    6.22192
+ ⋮                             ⋱              ⋮          
+ 6.26243   6.27134   6.27581      2.64288     2.6706     2.61906
+ 6.2476    6.26243   6.27134      2.65329     2.6706     2.67668
+ 6.26243   6.26243   6.27329   …  2.65212     2.64288    2.65212
+ 6.26243   6.26243   6.27329      2.64288     2.61859    2.65212
+ 6.27366   6.20852   6.27329      2.65212     2.61542    2.61542
+ 6.27366   6.27366   6.27329      2.65435     2.61542    2.65212
+ 6.27366   6.27366   6.27366      2.65435     2.61542    2.61542
+ 6.22724   6.27366   6.2756    …  2.65435     2.57678    2.57678
+ 6.22724   6.2756    6.2756       2.65465     2.65435    2.69787</code></pre><h3 id="Visualization"><a class="docs-heading-anchor" href="#Visualization">Visualization</a><a id="Visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Visualization" title="Permalink"></a></h3><p>Create comparison plots to visualize the filtering results:</p><pre><code class="language-julia hljs">CairoMakie.activate!(; type=&quot;png&quot;)
+
+# Create comparison plots
+fig = Figure(; size=(1200, 1000));
+
+# Ground truth phase
+ax1 = Axis(fig[1, 1]; title=&quot;Ground Truth Phase&quot;, aspect=DataAspect())
+hm1 = heatmap!(ax1, gt_phase; colormap=:hsv, colorrange=(0, 2π))
+Colorbar(fig[1, 2], hm1; label=&quot;Phase [rad]&quot;)
+
+# Noisy phase
+ax2 = Axis(fig[1, 3]; title=&quot;Noisy Phase&quot;, aspect=DataAspect())
+hm2 = heatmap!(ax2, noisy_phase; colormap=:hsv, colorrange=(0, 2π))
+Colorbar(fig[1, 4], hm2; label=&quot;Phase [rad]&quot;)
+
+# Filtered phase
+filter_size = 2 * filter_radius + 1
+ax3 = Axis(
+    fig[2, 1]; title=&quot;Filtered Phase ($(filter_size)×$(filter_size))&quot;, aspect=DataAspect()
+)
+hm3 = heatmap!(ax3, filtered_phase; colormap=:hsv, colorrange=(0, 2π))
+Colorbar(fig[2, 2], hm3; label=&quot;Phase [rad]&quot;)
+
+# Error maps
+error_noisy = CircleMedianFilter.d.(gt_phase, noisy_phase)
+error_filtered = CircleMedianFilter.d.(gt_phase, filtered_phase)
+
+# Error: Filtered vs GT
+ax4 = Axis(fig[2, 3]; title=&quot;Error: Filtered vs GT&quot;, aspect=DataAspect())
+hm4 = heatmap!(ax4, error_filtered; colormap=:hot, colorrange=(0, π))
+Colorbar(fig[2, 4], hm4; label=&quot;Error [rad]&quot;)
+
+Label(
+    fig[0, :],
+    &quot;Circular Median Filter Demo\nSalt-pepper: $(noise_fraction), Gaussian σ: $(gaussian_std), Filter: $(filter_size)×$(filter_size)&quot;;
+    fontsize=16,
+    halign=:center,
+)
+
+# Display the figure
+fig</code></pre><img src="b0359ca9.png" alt="Example block output"/><h3 id="Quantitative-Results"><a class="docs-heading-anchor" href="#Quantitative-Results">Quantitative Results</a><a id="Quantitative-Results-1"></a><a class="docs-heading-anchor-permalink" href="#Quantitative-Results" title="Permalink"></a></h3><p>Calculate error statistics to quantify the improvement:</p><pre><code class="language-julia hljs"># Statistics
+mean_error_noisy = mean(error_noisy)
+mean_error_filtered = mean(error_filtered)
+
+println(
+    &quot;Results for salt-pepper: $(noise_fraction), Gaussian σ: $(gaussian_std), Filter $(filter_size)×$(filter_size):&quot;,
+)
+println(&quot;  Mean error (noisy): $(round(mean_error_noisy, digits=4)) radians&quot;)
+println(&quot;  Mean error (filtered): $(round(mean_error_filtered, digits=4)) radians&quot;)
+println(
+    &quot;  Improvement: $(round((mean_error_noisy - mean_error_filtered) / mean_error_noisy * 100, digits=2))%&quot;,
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Results for salt-pepper: 0.25, Gaussian σ: 0.1, Filter 5×5:
+  Mean error (noisy): 0.4563 radians
+  Mean error (filtered): 0.0465 radians
+  Improvement: 89.82%</code></pre><h2 id="Noise-Reduction-Summary-Table"><a class="docs-heading-anchor" href="#Noise-Reduction-Summary-Table">Noise-Reduction Summary Table</a><a id="Noise-Reduction-Summary-Table-1"></a><a class="docs-heading-anchor-permalink" href="#Noise-Reduction-Summary-Table" title="Permalink"></a></h2><p>Compute noise-reduction statistics for multiple noise settings and filter sizes, then print a compact results table.</p><pre><code class="language-julia hljs">summary_rows = NamedTuple[]
+
+for noise_fraction in noise_levels
+    for gaussian_std in gaussian_levels
+        noisy = copy(gt_phase)
+        CircleMedianFilter.add_phase_noise!(noisy, noise_fraction, gaussian_std)
+
+        for r in filter_radii
+            filtered = similar(noisy)
+            arc_distance_median_filter!(filtered, noisy, r, r)
+
+            err_noisy = CircleMedianFilter.d.(gt_phase, noisy)
+            err_filtered = CircleMedianFilter.d.(gt_phase, filtered)
+
+            mean_noisy = mean(err_noisy)
+            mean_filtered = mean(err_filtered)
+            improvement = 100 * (mean_noisy - mean_filtered) / mean_noisy
+
+            push!(
+                summary_rows,
+                (
+                    salt_pepper=noise_fraction,
+                    gaussian_sigma=gaussian_std,
+                    filter_size=2r + 1,
+                    mean_error_noisy=mean_noisy,
+                    mean_error_filtered=mean_filtered,
+                    improvement_pct=improvement,
+                ),
+            )
+        end
+    end
+end
+
+tablestr = pretty_table(
+    summary_rows;
+    backend=:html,
+    formatters=[fmt__round(4, [4, 5]), fmt__round(2, [1, 2, 6])],
+)
+
+Base.HTML(tablestr)</code></pre>nothing<h2 id="Runtime-Benchmark-Across-Filter-Sizes-(Log-Scale)"><a class="docs-heading-anchor" href="#Runtime-Benchmark-Across-Filter-Sizes-(Log-Scale)">Runtime Benchmark Across Filter Sizes (Log-Scale)</a><a id="Runtime-Benchmark-Across-Filter-Sizes-(Log-Scale)-1"></a><a class="docs-heading-anchor-permalink" href="#Runtime-Benchmark-Across-Filter-Sizes-(Log-Scale)" title="Permalink"></a></h2><p>Measure runtime versus filter size for two image resolutions and visualize the results on a log-scale y-axis.</p><pre><code class="language-julia hljs">function median_runtime_seconds(input_phase, r; repeats=5)
+    out = similar(input_phase)
+
+    # Warmup to avoid first-call compilation costs in timing loop.
+    arc_distance_median_filter!(out, input_phase, r, r)
+
+    times = Float64[]
+    for _ in 1:repeats
+        t = @elapsed arc_distance_median_filter!(out, input_phase, r, r)
+        push!(times, t)
+    end
+    return median(times)
+end
+
+const benchmark_radii = 1:15  ## 3x3 up to 31x31
+const benchmark_sizes = [256, 512]
+
+benchmark_inputs = Dict{Int,Matrix{Float64}}()
+for n in benchmark_sizes
+    phase = CircleMedianFilter.create_test_phase(n, n)
+    CircleMedianFilter.add_phase_noise!(phase, 0.25, 0.1)
+    benchmark_inputs[n] = phase
+end
+
+runtime_results = Dict{Int,Vector{Float64}}()
+for n in benchmark_sizes
+    runtime_results[n] = [
+        median_runtime_seconds(benchmark_inputs[n], r) for r in benchmark_radii
+    ]
+end
+
+
+xvals = [(2r + 1)^2 for r in benchmark_radii]
+runtime_fig = Figure(; size=(900, 500))
+runtime_ax = Axis(
+    runtime_fig[1, 1];
+    title=&quot;Runtime vs Number of Filter-Mask Elements&quot;,
+    xlabel=&quot;Number of elements in filter mask&quot;,
+    ylabel=&quot;Runtime [s]&quot;,
+    xscale=log10,
+    yscale=log10,
+    xticks=xvals,
+)
+
+
+for n in benchmark_sizes
+    scatterlines!(
+        runtime_ax, xvals, runtime_results[n]; label=&quot;$(n)x$(n)&quot;, linewidth=2, markersize=8
+    )
+end
+
+axislegend(runtime_ax; position=:lt)
+runtime_fig</code></pre><img src="019d854a.png" alt="Example block output"/><h2 id="Key-Observations"><a class="docs-heading-anchor" href="#Key-Observations">Key Observations</a><a id="Key-Observations-1"></a><a class="docs-heading-anchor-permalink" href="#Key-Observations" title="Permalink"></a></h2><ol><li><strong>Edge Preservation</strong>: The circular median filter preserves sharp phase boundaries while reducing noise</li><li><strong>Circular Consistency</strong>: Unlike standard median filtering, the results maintain circular data properties</li><li><strong>Noise Reduction</strong>: Significant reduction in both salt-and-pepper and Gaussian noise</li><li><strong>Parameter Sensitivity</strong>: Larger filters provide more smoothing but may over-blur fine details</li></ol><p>This demonstration shows that circular median filtering is essential for proper processing of phase data, providing robust noise reduction while preserving the fundamental properties of circular measurements.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../api/">« API Reference</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Thursday 1 October 2026 13:28">Thursday 1 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
